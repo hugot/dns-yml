@@ -1,6 +1,14 @@
 
 domains:
   example.com:
+    soa:
+      primary: 'ns1.example.com'
+      hostmaster: 'infra@example.com'
+      refresh: 10800
+      retry: 3600
+      expire: 604800
+      default_ttl: 3600
+
     records:
       - type: A
         name: node.example.com

@@ -15,6 +15,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+const DefaultTTL = 86400
+
 func NewMapper(config *Config) (*Mapper, error) {
 	connectionString := fmt.Sprintf(
 		"%s:%s@tcp(%s)/%s",
@@ -94,13 +96,31 @@ func (m *Mapper) getOrCreateSavedDomain(domain string) (*database.Domain, error)
 // Note: directory is used to prefix relative filepaths in "file" record types.
 func (m *Mapper) Map(directory string, root *document.Root) error {
 	for domainName, domain := range root.Domains {
+		if domain.SOARecord.Hostmaster == "" || domain.SOARecord.Primary == "" {
+			return errors.New(
+				"either one of required SOA fields hostmaster or primary is not set" +
+					" see see https://doc.powerdns.com/authoritative/appendices/types.html#soa" +
+					" for documentation about these fields",
+			)
+		}
+
 		savedDomain, err := m.getOrCreateSavedDomain(domainName)
 
 		recordsToCreate := make([]database.Record, 0)
+
+		// a SOA record for domain
+		recordsToCreate = append(recordsToCreate, database.Record{
+			DomainID: savedDomain.ID,
+			Name:     domainName,
+			Type:     "SOA",
+			Content:  domain.SOARecord.ToContent(),
+			TTL:      DefaultTTL,
+		})
+
 		for _, record := range domain.Records {
 			ttl := record.TTL
 			if ttl == 0 {
-				ttl = 86400
+				ttl = DefaultTTL
 			}
 
 			recordToCreate := &database.Record{
