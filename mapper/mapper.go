@@ -19,7 +19,7 @@ type Mapper interface {
 	MapYaml(directory string, ymlReader io.Reader) error
 }
 
-const DefaultTTL = 86400
+const DefaultTTL = 3600
 
 const env_data_source_name = "DNS_YML_DSN"
 
