@@ -4,13 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"strings"
 
 	scwdomain "github.com/scaleway/scaleway-sdk-go/api/domain/v2beta1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
-	"gopkg.in/yaml.v2"
 	"snorba.art/hugo/dns-yml/document"
 )
 
@@ -58,17 +56,7 @@ type ScalewayMapper struct {
 }
 
 func (m *ScalewayMapper) MapYaml(directory string, ymlReader io.Reader) error {
-	ymlData, err := ioutil.ReadAll(ymlReader)
-
-	docRoot := &document.Root{}
-
-	err = yaml.Unmarshal(ymlData, docRoot)
-
-	if err != nil {
-		return err
-	}
-
-	return m.Map(directory, docRoot)
+	return mapYaml(m, directory, ymlReader)
 }
 
 func (m *ScalewayMapper) Map(directory string, root *document.Root) error {

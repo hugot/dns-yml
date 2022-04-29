@@ -8,35 +8,33 @@ import (
 	"strings"
 
 	"snorba.art/hugo/dns-yml/mapper"
+	"snorba.art/hugo/dns-yml/util"
 )
 
 const mapperPDNS = "pdns"
 const mapperScaleway = "scaleway"
+const mapperDry = "dry"
 
-var mappers = []string{mapperPDNS, mapperScaleway}
-
-func sliceContains(slice []string, thing string) bool {
-	for _, i := range slice {
-		if thing == i {
-			return true
-		}
-	}
-
-	return false
-}
+var mappers = []string{mapperPDNS, mapperScaleway, mapperDry}
 
 func main() {
 	cmd := flag.NewFlagSet("dns-yml", flag.ExitOnError)
 	mapperFlag := cmd.String(
 		"mapper",
 		"scaleway",
-		"Mapper to use. Available mappers: "+strings.Join(mappers, ", "),
+		"Mapper to use. Use the \"dry\" mapper to check the config without persisting it. Available mappers: "+strings.Join(mappers, ", "),
 	)
 	help := cmd.Bool("help", false, "Show this help")
 
 	err := cmd.Parse(os.Args[1:])
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if !util.SliceContainsString(mappers, *mapperFlag) {
+		log.Printf("Invalid mapper parameter %s", *mapperFlag)
+		cmd.Usage()
+		os.Exit(1)
 	}
 
 	if *help {
@@ -58,10 +56,13 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
-
-	if *mapperFlag == mapperScaleway {
+	} else if *mapperFlag == mapperScaleway {
 		dnsMapper, err = mapper.NewScalewayMapper(os.Getenv)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else if *mapperFlag == mapperDry {
+		dnsMapper, err = mapper.NewDryMapper(os.Getenv)
 		if err != nil {
 			log.Fatal(err)
 		}

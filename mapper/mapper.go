@@ -17,6 +17,7 @@ import (
 
 type Mapper interface {
 	MapYaml(directory string, ymlReader io.Reader) error
+	Map(directory string, root *document.Root) error
 }
 
 const DefaultTTL = 3600
@@ -49,8 +50,7 @@ type PDNSMapper struct {
 	DB *sql.DB
 }
 
-// Note: directory is used to prefix relative filepaths in "file" record types.
-func (m *PDNSMapper) MapYaml(directory string, ymlReader io.Reader) error {
+func mapYaml(mapper Mapper, directory string, ymlReader io.Reader) error {
 	ymlData, err := ioutil.ReadAll(ymlReader)
 
 	docRoot := &document.Root{}
@@ -61,7 +61,12 @@ func (m *PDNSMapper) MapYaml(directory string, ymlReader io.Reader) error {
 		return err
 	}
 
-	return m.Map(directory, docRoot)
+	return mapper.Map(directory, docRoot)
+}
+
+// Note: directory is used to prefix relative filepaths in "file" record types.
+func (m *PDNSMapper) MapYaml(directory string, ymlReader io.Reader) error {
+	return mapYaml(m, directory, ymlReader)
 }
 
 func (m *PDNSMapper) getOrCreateSavedDomain(domain string) (*database.Domain, error) {
