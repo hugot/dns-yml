@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -27,31 +26,22 @@ func sliceContains(slice []string, thing string) bool {
 }
 
 func main() {
-	argLen := len(os.Args)
-
-	if argLen != 3 {
-		fmt.Fprintln(os.Stderr, "Usage: dns-yml CONFIG DNS_DEFINITION")
-		return
-	}
-
 	cmd := flag.NewFlagSet("dns-yml", flag.ExitOnError)
 	mapperFlag := cmd.String(
 		"mapper",
 		"scaleway",
 		"Mapper to use. Available mappers: "+strings.Join(mappers, ", "),
 	)
-	err := cmd.Parse(os.Args)
+	help := cmd.Bool("help", false, "Show this help")
+
+	err := cmd.Parse(os.Args[1:])
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var dnsMapper mapper.Mapper
-	if *mapperFlag == mapperPDNS {
-		dnsMapper, err = mapper.NewPDNSMapper(os.Getenv)
-	}
-
-	if *mapperFlag == mapperScaleway {
-		log.Fatal("not implemented")
+	if *help {
+		cmd.Usage()
+		os.Exit(0)
 	}
 
 	definitionPath := cmd.Arg(0)
@@ -62,8 +52,25 @@ func main() {
 
 	definitionReader, err := os.Open(definitionPath)
 
+	var dnsMapper mapper.Mapper
+	if *mapperFlag == mapperPDNS {
+		dnsMapper, err = mapper.NewPDNSMapper(os.Getenv)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if *mapperFlag == mapperScaleway {
+		dnsMapper, err = mapper.NewScalewayMapper(os.Getenv)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	err = dnsMapper.MapYaml(filepath.Dir(definitionPath), definitionReader)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Printf("Successfully finished execution of %s mapper", *mapperFlag)
 }
