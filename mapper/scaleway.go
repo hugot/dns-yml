@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	scwdomain "github.com/scaleway/scaleway-sdk-go/api/domain/v2beta1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
@@ -109,7 +110,10 @@ func (m *ScalewayMapper) Map(directory string, root *document.Root) error {
 					value,
 				)
 				desired := &scwdomain.Record{
-					Name: record.Name,
+					Name: strings.TrimSuffix(
+						strings.TrimSuffix(record.Name, domainName),
+						".",
+					),
 					Type: scwdomain.RecordType(record.Type),
 					Data: value,
 					TTL:  uint32(ttl),
