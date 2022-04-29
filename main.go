@@ -1,13 +1,30 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"snorba.art/hugo/dns-yml/mapper"
 )
+
+const mapperPDNS = "pdns"
+const mapperScaleway = "scaleway"
+
+var mappers = []string{mapperPDNS, mapperScaleway}
+
+func sliceContains(slice []string, thing string) bool {
+	for _, i := range slice {
+		if thing == i {
+			return true
+		}
+	}
+
+	return false
+}
 
 func main() {
 	argLen := len(os.Args)
@@ -17,27 +34,35 @@ func main() {
 		return
 	}
 
-	configPath := os.Args[1]
-
-	configReader, err := os.Open(configPath)
+	cmd := flag.NewFlagSet("dns-yml", flag.ExitOnError)
+	mapperFlag := cmd.String(
+		"mapper",
+		"scaleway",
+		"Mapper to use. Available mappers: "+strings.Join(mappers, ", "),
+	)
+	err := cmd.Parse(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	config, err := mapper.ConfigFromYaml(configReader)
-	if err != nil {
-		log.Fatal(err)
+	var dnsMapper mapper.Mapper
+	if *mapperFlag == mapperPDNS {
+		dnsMapper, err = mapper.NewPDNSMapper(os.Getenv)
 	}
 
-	mapper, err := mapper.NewMapper(config)
-	if err != nil {
-		log.Fatal(err)
+	if *mapperFlag == mapperScaleway {
+		log.Fatal("not implemented")
 	}
 
-	definitionPath := os.Args[2]
+	definitionPath := cmd.Arg(0)
+	if definitionPath == "" {
+		cmd.Usage()
+		os.Exit(1)
+	}
+
 	definitionReader, err := os.Open(definitionPath)
 
-	err = mapper.MapYaml(filepath.Dir(definitionPath), definitionReader)
+	err = dnsMapper.MapYaml(filepath.Dir(definitionPath), definitionReader)
 	if err != nil {
 		log.Fatal(err)
 	}

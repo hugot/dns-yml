@@ -15,34 +15,42 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+type Mapper interface {
+	MapYaml(directory string, ymlReader io.Reader) error
+}
+
 const DefaultTTL = 86400
 
-func NewMapper(config *Config) (*Mapper, error) {
-	connectionString := fmt.Sprintf(
-		"%s:%s@tcp(%s)/%s",
-		config.Database.Username,
-		config.Database.Password,
-		config.Database.Address,
-		config.Database.Name,
-	)
+const env_data_source_name = "DNS_YML_DSN"
 
-	DB, err := sql.Open("mysql", connectionString)
+func NewPDNSMapper(env func(string) string) (*PDNSMapper, error) {
+	dsn := env(env_data_source_name)
+
+	if dsn == "" {
+		return nil, errors.New(
+			fmt.Sprintf(
+				`At least one config parameter is not set. All of the following environment variables must be set:
+                 - %s: string describing mysql database to connect to. Example: username:password@tcp(127.0.0.1:3306)/database`,
+				env_data_source_name,
+			),
+		)
+	}
+
+	DB, err := sql.Open("mysql", dsn)
 
 	if err != nil {
 		return nil, err
 	}
 
-	err = DB.Ping()
-
-	return &Mapper{DB: DB}, err
+	return &PDNSMapper{DB: DB}, DB.Ping()
 }
 
-type Mapper struct {
+type PDNSMapper struct {
 	DB *sql.DB
 }
 
 // Note: directory is used to prefix relative filepaths in "file" record types.
-func (m *Mapper) MapYaml(directory string, ymlReader io.Reader) error {
+func (m *PDNSMapper) MapYaml(directory string, ymlReader io.Reader) error {
 	ymlData, err := ioutil.ReadAll(ymlReader)
 
 	docRoot := &document.Root{}
@@ -56,7 +64,7 @@ func (m *Mapper) MapYaml(directory string, ymlReader io.Reader) error {
 	return m.Map(directory, docRoot)
 }
 
-func (m *Mapper) getOrCreateSavedDomain(domain string) (*database.Domain, error) {
+func (m *PDNSMapper) getOrCreateSavedDomain(domain string) (*database.Domain, error) {
 	domainStmt, err := m.DB.Prepare("SELECT id, name, type FROM domains WHERE name = ?")
 	if err != nil {
 		return nil, err
@@ -94,7 +102,7 @@ func (m *Mapper) getOrCreateSavedDomain(domain string) (*database.Domain, error)
 }
 
 // Note: directory is used to prefix relative filepaths in "file" record types.
-func (m *Mapper) Map(directory string, root *document.Root) error {
+func (m *PDNSMapper) Map(directory string, root *document.Root) error {
 	for domainName, domain := range root.Domains {
 		if domain.SOARecord.Hostmaster == "" || domain.SOARecord.Primary == "" {
 			return errors.New(
@@ -186,7 +194,7 @@ func (m *Mapper) Map(directory string, root *document.Root) error {
 	return nil
 }
 
-func (m *Mapper) applyRecords(domain *database.Domain, records []database.Record) error {
+func (m *PDNSMapper) applyRecords(domain *database.Domain, records []database.Record) error {
 	existingRecStmt, err := m.DB.Prepare("SELECT id FROM records WHERE domain_id = ?")
 	if err != nil {
 		return err
@@ -249,6 +257,6 @@ func (m *Mapper) applyRecords(domain *database.Domain, records []database.Record
 	return err
 }
 
-func (m *Mapper) Close() error {
+func (m *PDNSMapper) Close() error {
 	return m.DB.Close()
 }
