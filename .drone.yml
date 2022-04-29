@@ -1,0 +1,14 @@
+kind: pipeline
+name: default
+
+steps:
+- name: docker-build
+  image: plugins/docker
+  exlude:
+    - master
+  settings:
+    username: hugotty
+    password:
+      from_secret: docker_password
+    repo: "hugotty/dns-yml"
+    tags: latest
